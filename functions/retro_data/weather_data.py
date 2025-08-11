@@ -9,7 +9,7 @@ def get_weather():
         start_time = last_time - pd.Timedelta(days=7)
 
         df_recent = df[df["datetime"] >= start_time].copy()
-        df_recent = df_recent[["datetime", "solarenergy", "windspeed"]].reset_index(drop=True)
+        df_recent = df_recent[["datetime", "solarradiation", "windspeed", "temp", "cloudcover", "humidity", "sealevelpressure"]].reset_index(drop=True)
 
         return df_recent
 

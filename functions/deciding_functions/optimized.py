@@ -2,6 +2,9 @@ import pandas as pd
 import cvxpy as cp
 
 def optimize_energy_flow(df, battery_capacity, initial_battery, price_buy=100):
+    
+    print("⚙️ Verfügbare Solver:", cp.installed_solvers())
+
     n = len(df)
     demand = df["energy_demand"].values
     generation = df["total_energy_production"].values
@@ -52,11 +55,17 @@ def optimize_energy_flow(df, battery_capacity, initial_battery, price_buy=100):
     total_cost = cp.sum(grid_buy * price_buy)
     problem = cp.Problem(cp.Minimize(total_cost), constraints)
 
-    if "GLPK_MI" in cp.installed_solvers():
-        problem.solve(solver=cp.GLPK_MI)
+    for solver in ["GUROBI", "CBC", "GLPK_MI", "ECOS_BB"]:
+        if solver in cp.installed_solvers():
+            print(f"👉 Versuche Solver: {solver}")
+            try:
+                problem.solve(solver=solver)
+                print("✅ Solver erfolgreich:", solver)
+                break
+            except Exception as e:
+                print(f"❌ Fehler bei Solver {solver}: {e}")
     else:
-        raise RuntimeError("Solver für MIP nicht installiert.")
-
+        raise RuntimeError("Kein geeigneter MIP-Solver installiert.")
 
     # Statusprüfung ergänzen
     if problem.status not in ["optimal", "optimal_inaccurate"]:
