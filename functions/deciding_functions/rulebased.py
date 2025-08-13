@@ -1,16 +1,12 @@
 import pandas as pd
 
-def rule_based_energy_flow(df, df_spot, battery_capacity, initial_battery):
+def rule_based_energy_flow(df, battery_capacity, initial_battery):
     """
     df: DataFrame mit Spalten [datetime, energy_demand, total_energy_production]
     df_spot: DataFrame mit Spalten [datetime, spotprice] (lokale, naive Zeit)
     battery_capacity: MWh
     initial_battery: MWh
     """
-    # Spotpreise über datetime an den Haupt-Datensatz hängen (Left Join)
-    df = df.copy()
-    df = df.merge(df_spot[["datetime", "spotprice"]], on="datetime", how="left")
-
     battery_state = initial_battery
     results = []
 

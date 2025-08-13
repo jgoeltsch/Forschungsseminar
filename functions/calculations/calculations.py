@@ -7,7 +7,7 @@ def calculate_energy(
         df, 
         solar_peak_power, num_modules, area_per_module, module_efficiency, tilt_angle, latitude, longitude, azimuth, albedo, 
         wind_peak_power, r, h, turbine_efficiency, cut_in, cut_out, num_turbines, 
-        yearly_demand, num_houses,
+        yearly_demand, num_houses
     ):
 
     def solar_energy(datetime, solarradiation, cloudcover):
