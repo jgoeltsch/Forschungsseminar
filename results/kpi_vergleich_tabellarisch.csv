@@ -1,0 +1,5 @@
+,Netto Stromkosten gesamt [€],Netto Stromkosten/Tag [€/d],Netzstromkosten [€],Einspeisevergütung [€],Ø-Vergütung [€/MWh],Netzbezug [MWh],Einspeisung [MWh],Batterieladung [MWh],Batterieentladung [MWh]
+Regelbasiert,72150.03,10246.16,72502.36,352.33,3.99,907.8,352.98,137.77,143.77
+Optimiert,64270.64,9127.19,64481.35,210.71,1.21,1254.2,699.38,167.12,173.12
+abs. Differenz,-7879.39,-1118.97,-8021.01,-141.62,-2.79,346.4,346.4,29.35,29.35
+rel. Differenz [%],-10.92,-10.92,-11.06,-40.2,-69.82,38.16,98.14,21.3,20.41

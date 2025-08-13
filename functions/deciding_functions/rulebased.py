@@ -1,61 +1,97 @@
 import pandas as pd
+import numpy as np
 
-def rule_based_energy_flow(df, battery_capacity, initial_battery):
-    """
-    df: DataFrame mit Spalten [datetime, energy_demand, total_energy_production]
-    df_spot: DataFrame mit Spalten [datetime, spotprice] (lokale, naive Zeit)
-    battery_capacity: MWh
-    initial_battery: MWh
-    """
-    battery_state = initial_battery
-    results = []
+def rule_based_energy_flow(df: pd.DataFrame,
+                           battery_capacity: float,
+                           initial_battery: float,
+                           charging_rate: float,
+                           discharge_rate: float,
+                           export_price_factor: float,
+                           price_quantile: float = 0.30):
+    df = df.copy()
 
-    for _, row in df.iterrows():
-        demand = float(row["energy_demand"])                 # Strombedarf [MWh] in dieser Stunde
-        generation = float(row["total_energy_production"])   # Stromerzeugung [MWh] in dieser Stunde
+    # Zeitraster
+    t = pd.to_datetime(df["datetime"])
+    dt = np.diff(t.values).astype("timedelta64[m]").astype(float) / 60.0
+    if len(dt) == 0: dt = np.array([1.0])
+    dt = np.append(dt, dt[-1])
 
-        # 1. Eigennutzung: erzeugten Strom direkt für den Bedarf nutzen
-        used_generation = min(demand, generation)
+    # Preise in €/MWh
+    price = df["spotprice"].to_numpy() * 10.0
+    low_price_thresh = np.quantile(price, price_quantile)
 
-        # 2. Restbedarf / Überschuss berechnen
-        residual_demand = demand - used_generation             # Netzbezug, falls positiv [MWh]
-        excess_generation = generation - used_generation       # Einspeisung, falls positiv [MWh]
+    soc = initial_battery
+    rows = []
 
-        # 3. Akku laden mit überschüssiger Energie
-        battery_charge = min(battery_capacity - battery_state, max(excess_generation, 0.0))
-        battery_state += battery_charge
-        excess_generation -= battery_charge
+    for i, row in df.reset_index(drop=True).iterrows():
+        demand = float(row["energy_demand"])
+        gen    = float(row["total_energy_production"])
+        p      = price[i]
+        ch_lim = charging_rate  * dt[i]
+        dis_lim= discharge_rate * dt[i]
 
-        # 4. Akku entladen, um Restbedarf zu decken
-        battery_discharge = min(battery_state, max(residual_demand, 0.0))
-        battery_state -= battery_discharge
-        residual_demand -= battery_discharge
+        # EE -> Last
+        ee_to_load = min(demand, gen)
+        residual   = demand - ee_to_load
+        ee_excess  = gen - ee_to_load
 
-        results.append({
+        # EE -> Batterie
+        cap_room     = max(battery_capacity - soc, 0.0)
+        ee_ch_cap    = min(cap_room, ch_lim)
+        ee_to_batt   = min(max(ee_excess, 0.0), ee_ch_cap)
+        soc         += ee_to_batt
+        ee_excess   -= ee_to_batt
+        ch_left      = ee_ch_cap - ee_to_batt
+
+        # Netz -> Batterie bei niedrigen Preisen
+        grid_to_batt = 0.0
+        if ch_left > 0 and p <= low_price_thresh:
+            grid_to_batt = ch_left
+            soc += grid_to_batt
+
+        # Batterie -> Last nur wenn nicht geladen wurde
+        batt_discharge = 0.0
+        if ee_to_batt == 0.0 and grid_to_batt == 0.0:
+            batt_discharge = min(soc, dis_lim, residual)
+            soc -= batt_discharge
+            residual -= batt_discharge
+
+        # Netz -> Last
+        grid_to_load = max(residual, 0.0)
+
+        rows.append({
             "datetime": row["datetime"],
-            "grid_buy": max(residual_demand, 0.0),            # Strom aus Netz [MWh]
-            "grid_feed_in": max(excess_generation, 0.0),      # Überschuss ins Netz [MWh]
-            "battery_charge": battery_charge,                 # Akkuladung in dieser Stunde [MWh]
-            "battery_discharge": battery_discharge,           # Akkuentladung in dieser Stunde [MWh]
-            "battery_state": battery_state,                   # aktueller Akkustand [MWh]
-            "spotprice": row["spotprice"]                     # Strompreis in ct/kWh
+            "spotprice_EUR_per_MWh": p,
+            "EE_total_MWh": gen,
+            "demand_MWh": demand,
+            "ee_to_load_MWh": ee_to_load,
+            "ee_to_batt_MWh": ee_to_batt,
+            "ee_export_MWh": max(ee_excess, 0.0),
+            "grid_to_load_MWh": grid_to_load,
+            "grid_to_batt_MWh": grid_to_batt,
+            "batt_discharge_MWh": batt_discharge,
+            "SOC_MWh": soc,
+            "charge_mode_binary": 1 if (ee_to_batt + grid_to_batt) > 0 else 0
         })
 
-    result_df_rule = pd.DataFrame(results)
+    out = pd.DataFrame(rows)
 
-    # Kostenberechnung:
-    # grid_buy ist in MWh → Umrechnung in kWh (*1000)
-    # spotprice ist in ct/kWh → Umrechnung in € (/100)
-    result_df_rule["grid_buy_cost_eur"] = (
-        result_df_rule["grid_buy"] * 1000.0 * result_df_rule["spotprice"] / 100.0
-    )
+    # KPIs
+    grid_energy   = float((out["grid_to_load_MWh"] + out["grid_to_batt_MWh"]).sum())
+    grid_cost     = float(((out["grid_to_load_MWh"] + out["grid_to_batt_MWh"]) * out["spotprice_EUR_per_MWh"]).sum())
+    export_energy = float(out["ee_export_MWh"].sum())
+    export_rev    = float((export_price_factor * out["ee_export_MWh"] * out["spotprice_EUR_per_MWh"]).sum())
+    charge_total  = float((out["ee_to_batt_MWh"] + out["grid_to_batt_MWh"]).sum())
+    discharge_tot = float(out["batt_discharge_MWh"].sum())
+    net_cost      = grid_cost - export_rev
 
-    # Summe der Gesamtkosten aus Netzbezug in Euro
-    total_grid_cost_eur = result_df_rule["grid_buy_cost_eur"].sum()
-
-    # Originaldaten wieder mit den Berechnungsergebnissen zusammenführen
-    df = df.reset_index(drop=True)
-    result_df_rule = pd.concat([df.drop(columns=["spotprice"]),
-                                result_df_rule.drop(columns=["datetime"])], axis=1)
-
-    return result_df_rule, float(total_grid_cost_eur)
+    report = {
+        "Netto Stromkosten": net_cost,
+        "Netzstromkosten": grid_cost,
+        "Einspeisevergütung": export_rev,
+        "Netzbezug": grid_energy,
+        "Einspeisung": export_energy,
+        "Batterieladung": charge_total,
+        "Batterieentladung": discharge_tot
+    }
+    return out, report
