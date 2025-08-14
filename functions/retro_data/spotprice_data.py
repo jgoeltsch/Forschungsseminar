@@ -40,3 +40,5 @@ def get_spotprice():
     except Exception as e:
         print("Fehler beim Einlesen der Spotpreise:", e)
         return None
+
+#Quelle Datensatz: https://www.netztransparenz.de/de-de/Erneuerbare-Energien-und-Umlagen/EEG/Transparenzanforderungen/Marktpr%C3%A4mie/Spotmarktpreis-nach-3-Nr-42a-EEG

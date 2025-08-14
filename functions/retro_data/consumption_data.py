@@ -30,8 +30,16 @@ def get_demand(num_houses, yearly_demand):
         .dropna(subset=["datetime", "energy_demand"])
         .sort_values("datetime")
     )
+
+    # Mittelwert berechnen und speichern
+    hourly_demand_per_house = yearly_demand / (365*24)
+    hourly_demand_total = hourly_demand_per_house * num_houses
+
+    n_first_year = 365 * 24
+    mean_demand = out["energy_demand"].iloc[:n_first_year].mean()
+    scale_factor = mean_demand / hourly_demand_total
     
-        # ...existing code...
+    out["energy_demand"] = out["energy_demand"] / scale_factor
     
     # Letzte 7 Tage
     last_time = out["datetime"].max()
@@ -41,14 +49,8 @@ def get_demand(num_houses, yearly_demand):
 
     out = out[out["datetime"] >= start_time].reset_index(drop=True)
 
-    # Mittelwert berechnen und speichern
-    hourly_demand_per_house = yearly_demand / (365*24)
-    hourly_demand_total = hourly_demand_per_house * num_houses
-
-    mean_demand = out["energy_demand"].mean()
-    scale_factor = mean_demand / hourly_demand_total
-    
-    out["energy_demand"] = out["energy_demand"] / scale_factor
-
     return out
+
+
+#Quelle Datensatz: https://www.smard.de/home/downloadcenter/download-marktdaten/
 

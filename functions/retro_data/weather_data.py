@@ -16,3 +16,5 @@ def get_weather():
     except Exception as e:
         print("Fehler beim Einlesen der Wetterdaten:", e)
         return None
+
+#Quelle Datensatz: https://www.visualcrossing.com/weather-query-builder/
