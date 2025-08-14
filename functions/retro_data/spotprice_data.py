@@ -15,12 +15,13 @@ def get_spotprice():
             errors="coerce"
         ).dt.tz_localize("Europe/Berlin", ambiguous="infer", nonexistent="shift_forward"
         ).dt.tz_localize(None)  # Zeitzone entfernen, lokale Uhrzeit behalten
-
-        # Preis als float
+        
+        # Preis als float und Umrechnung in €/MWh
         price = pd.to_numeric(
             df["Spotmarktpreis in ct/kWh"].str.replace(",", ".", regex=False),
             errors="coerce"
-        )
+        ) * 10  # Umrechnung in €/MWh
+        
 
         # DataFrame
         out = (

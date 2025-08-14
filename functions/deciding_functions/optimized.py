@@ -8,8 +8,6 @@ def optimize_energy_flow(df: pd.DataFrame,
                          charging_rate: float,
                          discharge_rate: float,
                          export_price_factor: float):
-    df = df.copy()
-    df["spotprice"] = df["spotprice"] * 10.0  # ct/kWh -> €/MWh
 
     # Zeitraster [h]
     if "datetime" in df.columns:

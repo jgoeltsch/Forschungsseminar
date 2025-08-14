@@ -6,8 +6,7 @@ import numpy as np
 def calculate_energy(
         df, 
         solar_peak_power, num_modules, area_per_module, module_efficiency, tilt_angle, latitude, longitude, azimuth, albedo, 
-        wind_peak_power, r, h, turbine_efficiency, cut_in, cut_out, num_turbines, 
-        yearly_demand, num_houses
+        wind_peak_power, r, h, turbine_efficiency, cut_in, cut_out, num_turbines
     ):
 
     def solar_energy(datetime, solarradiation, cloudcover):
@@ -67,17 +66,6 @@ def calculate_energy(
 
         return min(P_wind, wind_peak_power)
 
-    def demand_energy(timestamp):
-        hourly_demand = yearly_demand * num_houses / (365 * 24)
-        hour = timestamp.hour
-        factor = (
-            0.6 if hour < 6 or hour >= 22 else
-            1.2 if hour < 9 else
-            1.1 if hour < 17 else
-            1.4
-        )
-        return hourly_demand * factor
-
     # Berechnungen auf DataFrame anwenden
     df['solar_energy_production'] = df.apply(
         lambda row: solar_energy(row['datetime'], row['solarradiation'], row['cloudcover']),
@@ -87,7 +75,6 @@ def calculate_energy(
         lambda row: wind_energy(row['windspeed'], row['sealevelpressure'], row['temp'], row['humidity']),
         axis=1
     )
-    df['energy_demand'] = df['datetime'].apply(demand_energy)
     df['total_energy_production'] = df['solar_energy_production'] + df['wind_energy_production']
 
     df['poa_irradiance'] = df.apply(
@@ -108,5 +95,5 @@ def calculate_energy(
     return df[[
         'datetime', 'windspeed', 'poa_irradiance',
         'solar_energy_production', 'wind_energy_production',
-        'energy_demand', 'total_energy_production'
+        'total_energy_production'
     ]]

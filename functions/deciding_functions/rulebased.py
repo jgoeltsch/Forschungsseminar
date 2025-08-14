@@ -17,7 +17,7 @@ def rule_based_energy_flow(df: pd.DataFrame,
     dt = np.append(dt, dt[-1])
 
     # Preise in €/MWh
-    price = df["spotprice"].to_numpy() * 10.0
+    price = df["spotprice"].to_numpy()
     low_price_thresh = np.quantile(price, price_quantile)
 
     soc = initial_battery
