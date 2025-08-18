@@ -22,7 +22,6 @@ def get_spotprice():
             errors="coerce"
         ) * 10  # Umrechnung in €/MWh
         
-
         # DataFrame
         out = (
             pd.DataFrame({"datetime": dt_local_naive, "spotprice": price})
@@ -30,12 +29,7 @@ def get_spotprice():
             .sort_values("datetime")
         )
 
-        # Letzte 7 Tage
-        last_time = out["datetime"].max()
-        start_time = last_time - pd.Timedelta(days=7)
-        out_recent = out[out["datetime"] >= start_time].reset_index(drop=True)
-
-        return out_recent
+        return out
 
     except Exception as e:
         print("Fehler beim Einlesen der Spotpreise:", e)

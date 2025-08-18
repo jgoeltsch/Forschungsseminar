@@ -7,8 +7,51 @@ def optimize_energy_flow(df: pd.DataFrame,
                          initial_battery: float,
                          charging_rate: float,
                          discharge_rate: float,
-                         export_price_factor: float):
+                         export_price_factor: float,
+                         window_days: int,
+                         step_hours: int):
+    """
+    Sliding-Window-Optimierung für den gesamten Datensatz.
+    """
+    window = pd.Timedelta(days=window_days)
+    step = pd.Timedelta(hours=step_hours)
+    start_time = df["datetime"].min()
+    end_time = df["datetime"].max()
+    results_opt = []
+    current_start = start_time
+    current_initial_battery = initial_battery
 
+    while current_start < end_time:
+        current_end = current_start + window
+        df_window = df[(df["datetime"] >= current_start) & (df["datetime"] < current_end)].copy()
+        if len(df_window) == 0:
+            break
+
+        # Einzelnes Fenster optimieren (ohne Sliding-Parameter)
+        result_df_opt = _single_window_optimization(
+            df_window,
+            battery_capacity,
+            current_initial_battery,
+            charging_rate,
+            discharge_rate,
+            export_price_factor
+        )
+
+        # Letztes Fenster komplett übernehmen, sonst nur step_hours
+        if current_end >= end_time:
+            results_opt.append(result_df_opt)
+            break
+        else:
+            results_opt.append(result_df_opt.iloc[:step_hours])
+
+        # SOC für das nächste Fenster übernehmen
+        current_initial_battery = result_df_opt["SOC_MWh"].iloc[step_hours - 1]
+        current_start += step
+
+    # Ergebnisse zu DataFrame zusammenfassen
+    return pd.concat(results_opt, ignore_index=True)
+
+def _single_window_optimization(df, battery_capacity, initial_battery, charging_rate, discharge_rate, export_price_factor):
     # Zeitraster [h]
     if "datetime" in df.columns:
         t = pd.to_datetime(df["datetime"])
@@ -49,15 +92,6 @@ def optimize_energy_flow(df: pd.DataFrame,
     m += lpSum([ P[i]*(gL[i] + gB[i]) - export_price_factor * P[i] * exp[i] for i in T ])
     m.solve(PULP_CBC_CMD(msg=False))
 
-    # KPIs
-    grid_energy   = sum(gL[i].value() + gB[i].value() for i in T)
-    grid_cost     = sum(P[i] * (gL[i].value() + gB[i].value()) for i in T)
-    export_energy = sum(exp[i].value() for i in T)
-    export_rev    = sum(export_price_factor * P[i] * exp[i].value() for i in T)
-    charge_total  = sum(cEE[i].value() + gB[i].value() for i in T)
-    discharge_tot = sum(d[i].value() for i in T)
-    net_cost      = grid_cost - export_rev
-
     out = pd.DataFrame({
         "datetime": df["datetime"] if "datetime" in df.columns else np.arange(len(df)),
         "spotprice_EUR_per_MWh": P,
@@ -74,13 +108,4 @@ def optimize_energy_flow(df: pd.DataFrame,
         "solver_status": LpStatus[m.status]
     })
 
-    report = {
-        "Netto Stromkosten": net_cost,
-        "Netzstromkosten": grid_cost,
-        "Einspeisevergütung": export_rev,
-        "Netzbezug": grid_energy,
-        "Einspeisung": export_energy,
-        "Batterieladung": charge_total,
-        "Batterieentladung": discharge_tot
-    }
-    return out, report
+    return out

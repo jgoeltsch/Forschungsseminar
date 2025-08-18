@@ -4,14 +4,9 @@ def get_weather():
     try:
         df = pd.read_csv("data\ds_weather_Harinvliet_Zuid_24_25.csv", parse_dates=["datetime"])
         df = df.sort_values("datetime")
+        df = df[["datetime", "solarradiation", "windspeed", "temp", "cloudcover", "humidity", "sealevelpressure"]].reset_index(drop=True)
 
-        last_time = df["datetime"].max()
-        start_time = last_time - pd.Timedelta(days=7)
-
-        df_recent = df[df["datetime"] >= start_time].copy()
-        df_recent = df_recent[["datetime", "solarradiation", "windspeed", "temp", "cloudcover", "humidity", "sealevelpressure"]].reset_index(drop=True)
-
-        return df_recent
+        return df
 
     except Exception as e:
         print("Fehler beim Einlesen der Wetterdaten:", e)

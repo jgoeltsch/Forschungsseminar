@@ -76,22 +76,4 @@ def rule_based_energy_flow(df: pd.DataFrame,
 
     out = pd.DataFrame(rows)
 
-    # KPIs
-    grid_energy   = float((out["grid_to_load_MWh"] + out["grid_to_batt_MWh"]).sum())
-    grid_cost     = float(((out["grid_to_load_MWh"] + out["grid_to_batt_MWh"]) * out["spotprice_EUR_per_MWh"]).sum())
-    export_energy = float(out["ee_export_MWh"].sum())
-    export_rev    = float((export_price_factor * out["ee_export_MWh"] * out["spotprice_EUR_per_MWh"]).sum())
-    charge_total  = float((out["ee_to_batt_MWh"] + out["grid_to_batt_MWh"]).sum())
-    discharge_tot = float(out["batt_discharge_MWh"].sum())
-    net_cost      = grid_cost - export_rev
-
-    report = {
-        "Netto Stromkosten": net_cost,
-        "Netzstromkosten": grid_cost,
-        "Einspeisevergütung": export_rev,
-        "Netzbezug": grid_energy,
-        "Einspeisung": export_energy,
-        "Batterieladung": charge_total,
-        "Batterieentladung": discharge_tot
-    }
-    return out, report
+    return out

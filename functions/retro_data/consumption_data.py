@@ -40,14 +40,6 @@ def get_demand(num_houses, yearly_demand):
     scale_factor = mean_demand / hourly_demand_total
     
     out["energy_demand"] = out["energy_demand"] / scale_factor
-    
-    # Letzte 7 Tage
-    last_time = out["datetime"].max()
-    if pd.isna(last_time):
-        return out  # leer oder ohne gültige Zeit
-    start_time = last_time - pd.Timedelta(days=7)
-
-    out = out[out["datetime"] >= start_time].reset_index(drop=True)
 
     return out
 
