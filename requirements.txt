@@ -1,7 +1,0 @@
-pandas
-numpy
-matplotlib
-cvxpy
-stable-baselines3
-torch
-gymnasium

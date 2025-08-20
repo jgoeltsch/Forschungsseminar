@@ -4,6 +4,21 @@ import pandas as pd
 from stable_baselines3 import DQN
 from gymnasium import spaces
 
+# Hilfsfunktion: Sliding-Window-Indices
+def get_window_indices(df, window_days, step_hours):
+    window_size = window_days * 24  # Annahme: stündliche Daten
+    indices = []
+    start = 0
+    while start + window_size <= len(df):
+        end = start + window_size
+        indices.append((start, end))
+        start += step_hours
+    # Letztes Fenster ggf. anhängen, falls nicht exakt aufgeht
+    if indices and indices[-1][1] < len(df):
+        indices.append((len(df) - window_size, len(df)))
+    return indices
+
+
 class EMSenv(gym.Env):
     """
     Action Mapping:
@@ -123,7 +138,9 @@ class EMSenv(gym.Env):
         }
         return obs, reward, terminated, truncated, info
 
-def reinforcement_learning(
+
+# Online-Learning mit Sliding Window
+def reinforcement_learning_train(
     df_train: pd.DataFrame,
     df_test: pd.DataFrame,
     battery_capacity: float,
@@ -133,43 +150,42 @@ def reinforcement_learning(
     export_price_factor: float,
     window_days: int,
     step_hours: int,
-    total_timesteps: int = 10000
+    total_timesteps: int
 ):
-    # RL-Training auf Trainingsdaten (gesamter Zeitraum)
+    
+    # Fenster-Indices
+    train_indices = get_window_indices(df_train, window_days, step_hours)
+    
+    # Modell initialisieren mit erstem Trainingsfenster
     env_train = EMSenv(
-        df_train, battery_capacity, initial_battery, charging_rate, discharge_rate, export_price_factor
+        df_train.iloc[train_indices[0][0]:train_indices[0][1]],
+        battery_capacity, initial_battery, charging_rate, discharge_rate, export_price_factor
     )
-    model = DQN("MlpPolicy", env_train, verbose=0)
-    model.learn(total_timesteps=total_timesteps)
+    model = DQN("MlpPolicy", env_train, verbose=1)
 
-    # RL-Rollout/Test auf gesamten Testdaten (ohne Sliding Window)
-    env_test = EMSenv(
-        df_test, battery_capacity, initial_battery, charging_rate, discharge_rate, export_price_factor
-    )
-    obs, info = env_test.reset()
-    terminated = False
-    truncated = False
-    rows = []
-    while not (terminated or truncated):
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, terminated, truncated, info = env_test.step(action)
-        idx = env_test.idx - 1
-        if idx < len(df_test):
-            row = df_test.iloc[idx]
-            rows.append({
-                "datetime": row["datetime"],
-                "spotprice_EUR_per_MWh": row["spotprice"],
-                "EE_total_MWh": row["total_energy_production"],
-                "demand_MWh": row["energy_demand"],
-                "ee_to_load_MWh": info["ee_to_load"],
-                "ee_to_batt_MWh": info["ee_to_batt"],
-                "ee_export_MWh": info["ee_export"],
-                "grid_to_load_MWh": info["grid_to_load"],
-                "grid_to_batt_MWh": info["grid_to_batt"],
-                "batt_discharge_MWh": info["batt_discharge"],
-                "SOC_MWh": info["SOC"],
-                "charge_mode_binary": 1 if (info["ee_to_batt"] + info["grid_to_batt"]) > 0 else 0,
-                "solver_status": "RL"
-            })
+    # TRAININGPHASE
+    soc_train = initial_battery
+    for i, train_idx in enumerate(train_indices):
+        train_start, train_end = train_idx
+        env_train = EMSenv(
+            df_train.iloc[train_start:train_end],
+            battery_capacity, soc_train, charging_rate, discharge_rate, export_price_factor
+        )
+        model.set_env(env_train)
+        model.learn(total_timesteps=total_timesteps, reset_num_timesteps=False)
+        # SOC am Ende des Trainingsfensters für nächstes Fenster übernehmen
+        obs, info = env_train.reset()
+        terminated = False
+        truncated = False
+        last_soc = soc_train
+        while not (terminated or truncated):
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env_train.step(action)
+            last_soc = info["SOC"]
+        soc_train = last_soc
 
-    return pd.DataFrame(rows)
+    # Modell speichern
+    model.save("model/rl_model_trained.zip")
+
+    # Kein Testteil mehr in diesem Skript. Nur Training und Speichern des Modells.
+    return model
