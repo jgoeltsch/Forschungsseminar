@@ -22,12 +22,16 @@ def get_window_indices(df, window_days, step_hours):
 class EMSenv(gym.Env):
     """
     Action Mapping:
-    0: Alles aus EE decken, Überschuss exportieren
-    1: EE deckt Last, Überschuss in Batterie
-    2: EE deckt Last, Netz lädt Batterie
-    3: Netz deckt Last, Batterie laden
-    4: Batterie entlädt zur Deckung der Last
-    5: Netz deckt Last, keine Batterieaktion
+
+    Stromüberschuss: 
+    0: EE->Load / EE->Batterie / EE->Grid  
+    1: EE->Load / EE->Batterie / Grid->Batterie
+    2: EE->Load / EE->Batterie
+
+    Stromdefizit:
+    3: EE->Load / Batterie->Load / Grid->Load
+    4: EE->Load / Grid->Load
+    5: EE->Load / Grid->Load / Grid->Batterie
     """
     def __init__(self, df, battery_capacity, initial_battery, charging_rate, discharge_rate, export_price_factor):
         super().__init__()
@@ -67,6 +71,7 @@ class EMSenv(gym.Env):
         demand = float(row["energy_demand"])
         gen = float(row["total_energy_production"])
         price = float(row["spotprice"])
+        net_demand = demand - gen
         reward = 0
 
         # Default Flüsse
@@ -77,43 +82,50 @@ class EMSenv(gym.Env):
         ee_export = 0
         batt_discharge = 0
 
-        # Action-Logik
-        if action == 0:
-            # EE deckt Last, Überschuss exportieren
-            ee_to_load = min(gen, demand)
-            ee_export = max(gen - demand, 0)
-            grid_to_load = max(demand - gen, 0)
-        elif action == 1:
-            # EE deckt Last, Überschuss in Batterie
-            ee_to_load = min(gen, demand)
-            rest = max(gen - demand, 0)
-            charge = min(self.charging_rate, self.battery_capacity - self.soc, rest)
-            ee_to_batt = charge
-            self.soc += charge
-            ee_export = max(rest - charge, 0)
-            grid_to_load = max(demand - gen, 0)
-        elif action == 2:
-            # EE deckt Last, Netz lädt Batterie
-            ee_to_load = min(gen, demand)
-            grid_to_load = max(demand - gen, 0)
-            charge = min(self.charging_rate, self.battery_capacity - self.soc)
-            grid_to_batt = charge
-            self.soc += charge
-        elif action == 3:
-            # Netz deckt Last, Batterie laden
-            grid_to_load = demand
-            charge = min(self.charging_rate, self.battery_capacity - self.soc)
-            grid_to_batt = charge
-            self.soc += charge
-        elif action == 4:
-            # Batterie entlädt zur Deckung der Last
-            discharge = min(self.discharge_rate, self.soc, demand)
-            batt_discharge = discharge
-            self.soc -= discharge
-            grid_to_load = max(demand - discharge, 0)
-        elif action == 5:
-            # Netz deckt Last, keine Batterieaktion
-            grid_to_load = demand
+        # Zugriff auf Instanzvariablen
+        soc = self.soc
+        battery_capacity = self.battery_capacity
+        charging_rate = self.charging_rate
+        discharge_rate = self.discharge_rate
+
+        # Action-Logik (unverändert, aber mit self-Integration)
+        if net_demand > 0:
+            # Zu wenig Energie
+            if action == 0 and soc > 0:  # 0: Batterie entlädt zur Deckung der Last, Rest Netz
+                batt_discharge = min(discharge_rate, soc, net_demand)
+                soc -= batt_discharge
+                rest = net_demand - batt_discharge
+                grid_to_load = max(rest, 0.0)
+            elif action == 1:  # 1: Nur Netz deckt Last
+                grid_to_load = net_demand
+            elif action == 2:  # 2: Netz deckt Last + lädt Batterie
+                grid_to_load = net_demand
+                if soc < battery_capacity:
+                    grid_to_batt = min(charging_rate, battery_capacity - soc)
+                    soc += grid_to_batt
+                else:
+                    grid_to_batt = 0.0
+            else:  # Fallback: Netz deckt Last
+                grid_to_load = net_demand
+        else:
+            # Zu viel Energie
+            rest = -net_demand
+            if action == 3 and soc < battery_capacity:  # 3: EE lädt Batterie, Rest exportieren
+                ee_to_batt = min(battery_capacity - soc, charging_rate, rest)
+                rest_2 = rest - ee_to_batt
+                ee_export = rest_2
+                soc += ee_to_batt
+            elif action == 4 and soc < battery_capacity and rest < charging_rate:  # 4: EE lädt Batterie + Netz lädt Batterie
+                ee_to_batt = rest
+                grid_to_batt = charging_rate - ee_to_batt
+                soc += ee_to_batt + grid_to_batt
+            elif action == 5 and rest < charging_rate:  # 5: EE lädt Batterie (nur bis zur Ladegrenze)
+                ee_to_batt = rest
+            else:  # Fallback: Überschuss exportieren
+                ee_export = rest
+
+        # Update SOC
+        self.soc = soc
 
         # Reward: negative Kosten (Kosten minimieren)
         cost = (
@@ -184,8 +196,11 @@ def reinforcement_learning_train(
             last_soc = info["SOC"]
         soc_train = last_soc
 
-    # Modell speichern
-    model.save("model/rl_model_trained.zip")
+    # Modell speichern mit Zeitstempel im Dateinamen
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    model_path = f"model/rl_model_trained_{timestamp}.zip"
+    model.save(model_path)
 
-    # Kein Testteil mehr in diesem Skript. Nur Training und Speichern des Modells.
+    # Training und Speichern des Modells.
     return model
