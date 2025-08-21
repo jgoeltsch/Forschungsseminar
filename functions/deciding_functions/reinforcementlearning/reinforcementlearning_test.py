@@ -1,13 +1,13 @@
 import pandas as pd
 
-def get_window_indices(df, window_days, step_hours):
-    window_size = window_days * 24  # Annahme: stündliche Daten
+def get_window_indices(df, forecast_horizon, stepsize):
+    window_size = forecast_horizon * 24  # Annahme: stündliche Daten
     indices = []
     start = 0
     while start + window_size <= len(df):
         end = start + window_size
         indices.append((start, end))
-        start += step_hours
+        start += stepsize
     if indices and indices[-1][1] < len(df):
         indices.append((len(df) - window_size, len(df)))
     return indices
@@ -17,12 +17,12 @@ def reinforcement_learning_test(
     df_test,
     env_class,
     env_kwargs,
-    window_days,
-    step_hours,
+    forecast_horizon,
+    stepsize,
     initial_battery
 ):
     
-    test_indices = get_window_indices(df_test, window_days, step_hours)
+    test_indices = get_window_indices(df_test, forecast_horizon, stepsize)
     soc_test = initial_battery
     results = []
 
@@ -63,10 +63,10 @@ def reinforcement_learning_test(
         if window_rows:
             soc_test = window_rows[-1]["SOC_MWh"]
 
-        # Ergebnisaggregation: nur die ersten step_hours übernehmen, außer letztes Fenster (alles)
+        # Ergebnisaggregation: nur die ersten stepsize übernehmen, außer letztes Fenster (alles)
         if i < num_windows - 1:
             if window_rows:
-                results.extend(window_rows[:step_hours])
+                results.extend(window_rows[:stepsize])
         else:
             results.extend(window_rows)
 

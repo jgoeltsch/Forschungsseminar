@@ -1,18 +1,20 @@
+from xml.parsers.expat import model
 import gymnasium as gym
 import numpy as np
 import pandas as pd
 from stable_baselines3 import DQN
 from gymnasium import spaces
+from datetime import datetime
 
 # Hilfsfunktion: Sliding-Window-Indices
-def get_window_indices(df, window_days, step_hours):
-    window_size = window_days * 24  # Annahme: stündliche Daten
+def get_window_indices(df, forecast_horizon, stepsize):
+    window_size = forecast_horizon * 24  # Annahme: stündliche Daten
     indices = []
     start = 0
     while start + window_size <= len(df):
         end = start + window_size
         indices.append((start, end))
-        start += step_hours
+        start += stepsize
     # Letztes Fenster ggf. anhängen, falls nicht exakt aufgeht
     if indices and indices[-1][1] < len(df):
         indices.append((len(df) - window_size, len(df)))
@@ -154,19 +156,18 @@ class EMSenv(gym.Env):
 # Online-Learning mit Sliding Window
 def reinforcement_learning_train(
     df_train: pd.DataFrame,
-    df_test: pd.DataFrame,
     battery_capacity: float,
     initial_battery: float,
     charging_rate: float,
     discharge_rate: float,
     export_price_factor: float,
-    window_days: int,
-    step_hours: int,
+    forecast_horizon: int,
+    stepsize: int,
     total_timesteps: int
 ):
     
     # Fenster-Indices
-    train_indices = get_window_indices(df_train, window_days, step_hours)
+    train_indices = get_window_indices(df_train, forecast_horizon, stepsize)
     
     # Modell initialisieren mit erstem Trainingsfenster
     env_train = EMSenv(
@@ -197,9 +198,8 @@ def reinforcement_learning_train(
         soc_train = last_soc
 
     # Modell speichern mit Zeitstempel im Dateinamen
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    model_path = f"model/rl_model_trained_{timestamp}.zip"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H_%M")
+    model_path = f"model/trained_model_{timestamp}.zip"
     model.save(model_path)
 
     # Training und Speichern des Modells.

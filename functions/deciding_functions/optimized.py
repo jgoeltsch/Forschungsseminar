@@ -8,13 +8,13 @@ def optimize_energy_flow(df: pd.DataFrame,
                          charging_rate: float,
                          discharge_rate: float,
                          export_price_factor: float,
-                         window_days: int,
-                         step_hours: int):
+                         forecast_horizon: int,
+                         stepsize: int):
     """
     Sliding-Window-Optimierung für den gesamten Datensatz.
     """
-    window = pd.Timedelta(days=window_days)
-    step = pd.Timedelta(hours=step_hours)
+    window = pd.Timedelta(days=forecast_horizon)
+    step = pd.Timedelta(hours=stepsize)
     start_time = df["datetime"].min()
     end_time = df["datetime"].max()
     results_opt = []
@@ -37,15 +37,15 @@ def optimize_energy_flow(df: pd.DataFrame,
             export_price_factor
         )
 
-        # Letztes Fenster komplett übernehmen, sonst nur step_hours
+        # Letztes Fenster komplett übernehmen, sonst nur stepsize
         if current_end >= end_time:
             results_opt.append(result_df_opt)
             break
         else:
-            results_opt.append(result_df_opt.iloc[:step_hours])
+            results_opt.append(result_df_opt.iloc[:stepsize])
 
         # SOC für das nächste Fenster übernehmen
-        current_initial_battery = result_df_opt["SOC_MWh"].iloc[step_hours - 1]
+        current_initial_battery = result_df_opt["SOC_MWh"].iloc[stepsize - 1]
         current_start += step
 
     # Ergebnisse zu DataFrame zusammenfassen
