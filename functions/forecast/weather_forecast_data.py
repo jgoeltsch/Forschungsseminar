@@ -2,7 +2,7 @@ import pandas as pd
 
 def get_weather_forecast():
     try:
-        df = pd.read_csv("data\_validation\ds_forecast_weather_20_21Aug.csv", parse_dates=["datetime"])
+        df = pd.read_csv("data/_validation/ds_forecast_weather_20_22Aug.csv", parse_dates=["datetime"])
         df = df.sort_values("datetime")
         df = df[["datetime", "solarradiation", "windspeed", "temp", "cloudcover", "humidity", "sealevelpressure"]].reset_index(drop=True)
 

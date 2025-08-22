@@ -13,7 +13,7 @@ def optimize_energy_flow(df: pd.DataFrame,
     """
     Sliding-Window-Optimierung für den gesamten Datensatz.
     """
-    window = pd.Timedelta(days=forecast_horizon)
+    window = pd.Timedelta(hours=forecast_horizon)
     step = pd.Timedelta(hours=stepsize)
     start_time = df["datetime"].min()
     end_time = df["datetime"].max()

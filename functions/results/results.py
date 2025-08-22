@@ -1,4 +1,4 @@
-def get_results(result_df_rule, result_df_opt, result_df_rl, result_kpis_rule, result_kpis_opt, result_kpis_rl, export_factor):
+def get_results(result_df_rule, result_df_opt, result_df_opt_fore, result_kpis_rule, result_kpis_opt, result_kpis_opt_fore, export_factor):
     
     # KPIs ausgeben
     print("Regelbasiert:")
@@ -12,7 +12,7 @@ def get_results(result_df_rule, result_df_opt, result_df_rl, result_kpis_rule, r
     print(f"Batterieladung: {result_kpis_rule['Batterieladung']:.2f} MWh")
     print(f"Batterieentladung: {result_kpis_rule['Batterieentladung']:.2f} MWh")
     print("----------------------")
-    print("Optimiert:")
+    print("Optimiert (ohne Prognose):")
     print(f"Netto Stromkosten: {result_kpis_opt['Netto Stromkosten']:.2f} €")
     print(f"Netzstromkosten: {result_kpis_opt['Netzstromkosten']:.2f} €")
     print(f"Einspeisevergütung: {result_kpis_opt['Einspeisevergütung']:.2f} €")
@@ -23,16 +23,16 @@ def get_results(result_df_rule, result_df_opt, result_df_rl, result_kpis_rule, r
     print(f"Batterieladung: {result_kpis_opt['Batterieladung']:.2f} MWh")
     print(f"Batterieentladung: {result_kpis_opt['Batterieentladung']:.2f} MWh")
     print("----------------------")
-    print("Reinforcement Learning:")
-    print(f"Netto Stromkosten: {result_kpis_rl['Netto Stromkosten']:.2f} €")
-    print(f"Netzstromkosten: {result_kpis_rl['Netzstromkosten']:.2f} €")
-    print(f"Einspeisevergütung: {result_kpis_rl['Einspeisevergütung']:.2f} €")
-    wavg_price_rl = (result_df_rl["spotprice_EUR_per_MWh"] * result_df_rl["ee_export_MWh"]).sum() / max(result_kpis_rl["Einspeisung"], 1e-9)
+    print("Optimiert (mit Prognose):")
+    print(f"Netto Stromkosten: {result_kpis_opt_fore['Netto Stromkosten']:.2f} €")
+    print(f"Netzstromkosten: {result_kpis_opt_fore['Netzstromkosten']:.2f} €")
+    print(f"Einspeisevergütung: {result_kpis_opt_fore['Einspeisevergütung']:.2f} €")
+    wavg_price_rl = (result_df_opt_fore["spotprice_EUR_per_MWh"] * result_df_opt_fore["ee_export_MWh"]).sum() / max(result_kpis_opt_fore["Einspeisung"], 1e-9)
     print(f"Export-gewichteter Preis (RL):  {wavg_price_rl:.2f} €/MWh")
-    print(f"Netzbezug: {result_kpis_rl['Netzbezug']:.2f} MWh")
-    print(f"Einspeisung: {result_kpis_rl['Einspeisung']:.2f} MWh")
-    print(f"Batterieladung: {result_kpis_rl['Batterieladung']:.2f} MWh")
-    print(f"Batterieentladung: {result_kpis_rl['Batterieentladung']:.2f} MWh")
+    print(f"Netzbezug: {result_kpis_opt_fore['Netzbezug']:.2f} MWh")
+    print(f"Einspeisung: {result_kpis_opt_fore['Einspeisung']:.2f} MWh")
+    print(f"Batterieladung: {result_kpis_opt_fore['Batterieladung']:.2f} MWh")
+    print(f"Batterieentladung: {result_kpis_opt_fore['Batterieentladung']:.2f} MWh")
     print("----------------------")
 
 
@@ -43,11 +43,11 @@ def get_results(result_df_rule, result_df_opt, result_df_rl, result_kpis_rule, r
     # Zeitspalten
     result_df_opt["datetime"] = pd.to_datetime(result_df_opt["datetime"])
     result_df_rule["datetime"] = pd.to_datetime(result_df_rule["datetime"])
-    result_df_rl["datetime"] = pd.to_datetime(result_df_rl["datetime"])
+    result_df_opt_fore["datetime"] = pd.to_datetime(result_df_opt_fore["datetime"])
     # Kopien + Hilfsspalten
     opt  = result_df_opt.copy()
     rule = result_df_rule.copy()
-    rl   = result_df_rl.copy()
+    rl   = result_df_opt_fore.copy()
     for df in (opt, rule, rl):
         df["grid_buy"]       = df["grid_to_load_MWh"] + df["grid_to_batt_MWh"]
         df["battery_state"]  = df["SOC_MWh"]

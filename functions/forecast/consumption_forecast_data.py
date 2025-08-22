@@ -19,7 +19,8 @@ def get_demand_forecast(num_houses, yearly_demand):
     # Filter: nur 20.08.2024 und 21.08.2024 bis 15:00 Uhr
     mask = (
         (dt_local_naive.dt.date == pd.to_datetime("2024-08-20").date()) |
-        ((dt_local_naive.dt.date == pd.to_datetime("2024-08-21").date()) & (dt_local_naive.dt.hour <= 15))
+        (dt_local_naive.dt.date == pd.to_datetime("2024-08-21").date()) |
+        ((dt_local_naive.dt.date == pd.to_datetime("2024-08-22").date()) & (dt_local_naive.dt.hour <= 22))
     )
 
     # Deutsches Zahlenformat -> Float

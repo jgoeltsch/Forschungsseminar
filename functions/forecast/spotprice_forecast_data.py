@@ -4,7 +4,7 @@ import pandas as pd
 def get_spotprice_forecast():
     try:
         df = pd.read_csv(
-            r"data/_validation/ds_forecast_spotprice_20_21Aug.csv",
+            r"data/_validation/ds_forecast_spotprice_20_22Aug.csv",
             sep=",",
             dtype=str
         )[["Von", "Prognosepreis (ct/kWh)", "Tatsächlicher Preis (ct/kWh)"]]

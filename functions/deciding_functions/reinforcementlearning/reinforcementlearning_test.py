@@ -1,7 +1,7 @@
 import pandas as pd
 
 def get_window_indices(df, forecast_horizon, stepsize):
-    window_size = forecast_horizon * 24  # Annahme: stündliche Daten
+    window_size = forecast_horizon  # Annahme: stündliche Daten
     indices = []
     start = 0
     while start + window_size <= len(df):
