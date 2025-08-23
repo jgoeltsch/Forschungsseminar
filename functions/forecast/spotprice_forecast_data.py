@@ -4,7 +4,7 @@ import pandas as pd
 def get_spotprice_forecast():
     try:
         df = pd.read_csv(
-            r"data/_validation/ds_forecast_spotprice_20_22Aug.csv",
+            r"data/_validation/ds_forecast_spotprice_20_23Aug.csv",
             sep=",",
             dtype=str
         )[["Von", "Prognosepreis (ct/kWh)", "Tatsächlicher Preis (ct/kWh)"]]
@@ -19,17 +19,17 @@ def get_spotprice_forecast():
         forecast_price = pd.to_numeric(
             df["Prognosepreis (ct/kWh)"],
             errors="coerce"
-        )
+        ) * 10  # Preis multiplizieren
+
         real_price = pd.to_numeric(
             df["Tatsächlicher Preis (ct/kWh)"],
             errors="coerce"
-        )
+        ) * 10  # Preis multiplizieren
 
         out_forecast = (
             pd.DataFrame({
                 "datetime": dt_local_naive,
                 "spotprice": forecast_price,
-                
             })
             .dropna(subset=["datetime", "spotprice"])
             .sort_values("datetime")

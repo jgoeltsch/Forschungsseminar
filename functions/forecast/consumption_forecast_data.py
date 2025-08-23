@@ -20,7 +20,8 @@ def get_demand_forecast(num_houses, yearly_demand):
     mask = (
         (dt_local_naive.dt.date == pd.to_datetime("2024-08-20").date()) |
         (dt_local_naive.dt.date == pd.to_datetime("2024-08-21").date()) |
-        ((dt_local_naive.dt.date == pd.to_datetime("2024-08-22").date()) & (dt_local_naive.dt.hour <= 22))
+        (dt_local_naive.dt.date == pd.to_datetime("2024-08-22").date()) |
+        ((dt_local_naive.dt.date == pd.to_datetime("2024-08-23").date()) & (dt_local_naive.dt.hour <= 12))
     )
 
     # Deutsches Zahlenformat -> Float
